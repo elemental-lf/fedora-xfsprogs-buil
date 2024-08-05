@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  cancel:
+    name: "Cancel previous workflow runs"
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          workflow_id: build.yaml
+          access_token: ${{ github.token }}
+
+  build:
+    name: "Build xfsprogs artifacts"
+    needs: cancel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository files
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Install earthly
+        uses: earthly/actions-setup@v1
+        with:
+          github-token: ${{ github.token }}
+      - name: Build xfsprogs
+        run: |
+          earthly +build
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: false
+          token: ${{ secrets.RELEASE_TOKEN }}
+          files: RPMS/**
